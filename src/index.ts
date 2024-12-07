@@ -86,33 +86,46 @@ export class NpmDependencyAnalyzer {
     }
 
     try {
-      const response = await fetch(
-        `${this.config.registry}/${name}/${version}`,
+      // First fetch the package metadata to get all versions
+      const metadataResponse = await fetch(
+        `${this.config.registry}/${name}`,
         {
           headers: this.config.headers,
           signal: AbortSignal.timeout(this.config.timeout),
         }
       );
 
-      if (!response.ok) {
+      if (!metadataResponse.ok) {
         throw new PackageNotFoundError(name, version);
       }
 
-      const data = await response.json();
-      if (!data.name || !data.version) {
+      const metadata = await metadataResponse.json();
+      const versions = metadata.versions || {};
+      
+      // Find the exact version or best matching version
+      let matchedVersion: string | null = null;
+      if (versions[version]) {
+        // Exact version match
+        matchedVersion = version;
+      } else if (semver.validRange(version)) {
+        // Find highest version that satisfies the range
+        matchedVersion = semver.maxSatisfying(Object.keys(versions), version);
+      }
+
+      if (!matchedVersion) {
         throw new PackageNotFoundError(
           name,
           version,
-          new Error('Invalid package data format')
+          new Error('No matching version found')
         );
       }
 
       const packageInfo: PackageInfo = {
-        name: data.name,
-        version: data.version,
-        dependencies: data.dependencies || {},
-        devDependencies: data.devDependencies || {},
-        peerDependencies: data.peerDependencies || {},
+        name: metadata.versions[matchedVersion].name,
+        version: matchedVersion,
+        dependencies: metadata.versions[matchedVersion].dependencies || {},
+        devDependencies: metadata.versions[matchedVersion].devDependencies || {},
+        peerDependencies: metadata.versions[matchedVersion].peerDependencies || {},
       };
 
       // Cache the result
