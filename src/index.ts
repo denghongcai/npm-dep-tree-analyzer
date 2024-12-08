@@ -107,6 +107,9 @@ export class NpmDepTreeAnalyzer {
       if (versions[version]) {
         // Exact version match
         matchedVersion = version;
+      } else if (metadata['dist-tags'] && metadata['dist-tags'][version]) {
+        // Check if the version is a known dist-tag
+        matchedVersion = metadata['dist-tags'][version];
       } else if (semver.validRange(version)) {
         // Find highest version that satisfies the range
         matchedVersion = semver.maxSatisfying(Object.keys(versions), version);

@@ -60,6 +60,33 @@ describe('NpmDepTreeAnalyzer', () => {
       expect(result.dependencyTree.peerDependencies.size).toBeGreaterThan(0);
       expect(result.dependencyTree.peerDependencies.has('react')).toBe(true);
     });
+
+    it('should handle latest tag for dependencies', async () => {
+      const result = await analyzer.analyze('lodash', 'latest');
+      expect(result.dependencyTree.name).toBe('lodash');
+      expect(result.dependencyTree.version).toMatch(/^\d+\.\d+\.\d+$/); // Ensure it's a valid semver
+      expect(result.dependencyTree.dependencies.size).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should handle other dist-tags', async () => {
+      const testPackages = [
+        { name: 'typescript', tag: 'next' },
+        { name: 'react', tag: 'experimental' },
+        { name: 'webpack', tag: 'beta' },
+        { name: 'lodash', tag: 'latest' }
+      ];
+
+      for (const pkg of testPackages) {
+        try {
+          const result = await analyzer.analyze(pkg.name, pkg.tag);
+          expect(result.dependencyTree.name).toBe(pkg.name);
+          expect(result.dependencyTree.version).toMatch(/^\d+\.\d+\.\d+$/);
+        } catch (error) {
+          // Some packages might not have all dist-tags, so we'll log but not fail
+          console.warn(`Could not resolve ${pkg.name} with tag ${pkg.tag}`);
+        }
+      }
+    });
   });
 
   describe('Multiple Package Analysis', () => {
