@@ -59,7 +59,7 @@ describe('NpmDependencyAnalyzer', () => {
       expect(result.dependencyTree.name).toBe('@testing-library/react');
       expect(result.dependencyTree.peerDependencies.size).toBeGreaterThan(0);
       expect(result.dependencyTree.peerDependencies.has('react')).toBe(true);
-    }, 30000);
+    });
   });
 
   describe('Multiple Package Analysis', () => {
@@ -93,7 +93,7 @@ describe('NpmDependencyAnalyzer', () => {
       expect(result).toBeDefined();
       NpmDependencyAnalyzer.printDependencyTree(result.dependencyTree);
       expect(consoleSpy).toHaveBeenCalled();
-    }, 30000);
+    });
 
     it('should handle registry timeout', async () => {
       const timeoutAnalyzer = new NpmDependencyAnalyzer({
