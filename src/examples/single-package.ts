@@ -1,26 +1,29 @@
-import { NpmDependencyAnalyzer } from '../index';
+import { NpmDepTreeAnalyzer } from '../index';
 
 async function main() {
   // Initialize analyzer with custom registry
-  const analyzer = new NpmDependencyAnalyzer({
+  const analyzer = new NpmDepTreeAnalyzer({
     registry: 'https://registry.npmmirror.com',
     timeout: 30000,
     headers: {
-      'User-Agent': 'npm-dependency-analyzer-example',
-    },
+      'User-Agent': 'npm-dep-tree-analyzer-example'
+    }
   });
 
-  // Analyze express package
-  console.log('\nExample 1: Analyzing express@4.18.2...');
-  const result = await analyzer.analyze('express', '4.18.2');
+  // Example package to analyze
+  const packageName = 'next';
+  const version = '14.0.3';
+
+  console.log(`\nExample 1: Analyzing ${packageName}@${version}...`);
+  const result = await analyzer.analyze(packageName, version);
 
   // Print dependency tree
   console.log('\nDependency Tree:');
-  NpmDependencyAnalyzer.printDependencyTree(result.dependencyTree);
+  NpmDepTreeAnalyzer.printDependencyTree(result.dependencyTree);
 
-  // Print hoisted tree (node_modules structure)
+  // Print hoisted tree
   console.log('\nHoisted Tree:');
-  NpmDependencyAnalyzer.printHoistedTree(result.hoistedTree);
+  NpmDepTreeAnalyzer.printHoistedTree(result.hoistedTree);
 }
 
 main().catch(console.error);

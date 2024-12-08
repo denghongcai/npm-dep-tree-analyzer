@@ -1,5 +1,5 @@
 {
-  "name": "npm-dependency-analyzer",
+  "name": "npm-dep-tree-analyzer",
   "version": "0.0.0-semantically-released",
   "description": "A utility for analyzing npm package dependencies",
   "main": "dist/index.js",

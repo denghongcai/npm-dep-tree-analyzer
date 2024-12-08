@@ -59,7 +59,7 @@ export interface MultiPackageAnalysisResult {
   };
 }
 
-export class NpmDependencyAnalyzer {
+export class NpmDepTreeAnalyzer {
   private readonly defaultRegistry = 'https://registry.npmjs.org';
   private readonly defaultTimeout = 30000; // 30 seconds
   private readonly config: Required<NpmRegistryConfig>;
@@ -215,7 +215,7 @@ export class NpmDependencyAnalyzer {
       const isLast = index === entries.length - 1;
       const newPrefix = prefix + (isLast ? '└── ' : '├── ');
       const childPrefix = prefix + (isLast ? '    ' : '│   ');
-      NpmDependencyAnalyzer.printDependencyTree(dep, newPrefix);
+      NpmDepTreeAnalyzer.printDependencyTree(dep, newPrefix);
     });
   }
 

@@ -1,8 +1,8 @@
-import { NpmDependencyAnalyzer } from '../index';
+import { NpmDepTreeAnalyzer } from '../index';
 
 async function main() {
   // Initialize analyzer with custom registry
-  const analyzer = new NpmDependencyAnalyzer({
+  const analyzer = new NpmDepTreeAnalyzer({
     registry: 'https://registry.npmmirror.com',
     timeout: 30000,
     headers: {
@@ -22,13 +22,13 @@ async function main() {
 
   // Print combined hoisted tree
   console.log('\nCombined Hoisted Tree:');
-  NpmDependencyAnalyzer.printHoistedTree(result.combined.hoistedTree);
+  NpmDepTreeAnalyzer.printHoistedTree(result.combined.hoistedTree);
 
   // Print individual dependency trees
   console.log('\nIndividual Package Trees:');
   for (const [pkgKey, analysis] of result.individual) {
     console.log(`\nDependency Tree for ${pkgKey}:`);
-    NpmDependencyAnalyzer.printDependencyTree(analysis.dependencyTree);
+    NpmDepTreeAnalyzer.printDependencyTree(analysis.dependencyTree);
   }
 }
 
