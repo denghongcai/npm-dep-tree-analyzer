@@ -64,6 +64,7 @@ export class NpmDepTreeAnalyzer {
   private readonly defaultTimeout = 30000; // 30 seconds
   private readonly config: Required<NpmRegistryConfig>;
   private readonly packageCache = new Map<string, PackageInfo>();
+  private readonly getPackageInfoPromises = new Map<string, Promise<PackageInfo>>();
 
   constructor(config: NpmRegistryConfig = {}) {
     this.config = {
@@ -76,7 +77,21 @@ export class NpmDepTreeAnalyzer {
     };
   }
 
-  private async getPackageInfo(
+  private getPackageInfo(name: string, version: string): Promise<PackageInfo> {
+    const cacheKey = `${name}@${version}`;
+
+      const promise = this.getPackageInfoPromises.get(cacheKey);
+      if (promise) {
+        return promise;
+      }
+      const task = this._getPackageInfo(name, version).finally(() => {
+        this.getPackageInfoPromises.delete(cacheKey);
+      });
+      this.getPackageInfoPromises.set(cacheKey, task);
+      return task;
+  }
+
+  private async _getPackageInfo(
     name: string,
     version: string
   ): Promise<PackageInfo> {
@@ -101,7 +116,7 @@ export class NpmDepTreeAnalyzer {
 
       const metadata = await metadataResponse.json();
       const versions = metadata.versions || {};
-      
+
       // Find the exact version or best matching version
       let matchedVersion: string | null = null;
       if (versions[version]) {
