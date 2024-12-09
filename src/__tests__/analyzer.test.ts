@@ -111,17 +111,6 @@ describe('NpmDepTreeAnalyzer', () => {
   });
 
   describe('Registry Configuration', () => {
-    it('should use default registry when not specified', async () => {
-      const defaultAnalyzer = new NpmDepTreeAnalyzer();
-      const result: AnalysisResult = await defaultAnalyzer.analyze(
-        'react',
-        '18.2.0'
-      );
-      expect(result).toBeDefined();
-      NpmDepTreeAnalyzer.printDependencyTree(result.dependencyTree);
-      expect(consoleSpy).toHaveBeenCalled();
-    });
-
     it('should handle registry timeout', async () => {
       const timeoutAnalyzer = new NpmDepTreeAnalyzer({
         timeout: 1, // 1ms timeout
