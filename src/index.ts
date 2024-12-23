@@ -122,7 +122,7 @@ export class NpmDepTreeAnalyzer {
       const lastAtSymbol = version.lastIndexOf('@');
       alias = {
         name: version.substring(4, lastAtSymbol),
-        version: version.substring(lastAtSymbol + 1),
+        version: version.substring(lastAtSymbol + 2),
       };
     }
 
