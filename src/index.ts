@@ -22,6 +22,10 @@ export interface DependencyNode {
 export interface FlatDependency {
   name: string;
   version: string;
+  alias?: {
+    name: string;
+    version: string;
+  },
   requiredBy: Set<string>;
 }
 
@@ -210,6 +214,7 @@ export class NpmDepTreeAnalyzer {
       flatDeps.set(key, {
         name,
         version: packageInfo.version,
+        alias: packageInfo.alias,
         requiredBy: new Set([currentPath.join(' > ') || 'root']),
       });
     } else {
