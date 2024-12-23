@@ -6,6 +6,10 @@ interface PackageInfo {
   dependencies?: { [key: string]: string };
   devDependencies?: { [key: string]: string };
   peerDependencies?: { [key: string]: string };
+  alias?: {
+    name: string;
+    version: string;
+  };
 }
 
 export interface DependencyNode {
@@ -46,8 +50,8 @@ interface PackageRequest {
 }
 
 export interface AnalysisResult {
-  dependencyTree: DependencyNode;
-  hoistedTree: HoistedTree;
+  dependencyTree?: DependencyNode;
+  hoistedTree?: HoistedTree;
   flatDependencies: Map<string, FlatDependency>;
 }
 
@@ -64,7 +68,10 @@ export class NpmDepTreeAnalyzer {
   private readonly defaultTimeout = 30000; // 30 seconds
   private readonly config: Required<NpmRegistryConfig>;
   private readonly packageCache = new Map<string, PackageInfo>();
-  private readonly getPackageInfoPromises = new Map<string, Promise<PackageInfo>>();
+  private readonly getPackageInfoPromises = new Map<
+    string,
+    Promise<PackageInfo>
+  >();
 
   constructor(config: NpmRegistryConfig = {}) {
     this.config = {
@@ -80,15 +87,15 @@ export class NpmDepTreeAnalyzer {
   private getPackageInfo(name: string, version: string): Promise<PackageInfo> {
     const cacheKey = `${name}@${version}`;
 
-      const promise = this.getPackageInfoPromises.get(cacheKey);
-      if (promise) {
-        return promise;
-      }
-      const task = this._getPackageInfo(name, version).finally(() => {
-        this.getPackageInfoPromises.delete(cacheKey);
-      });
-      this.getPackageInfoPromises.set(cacheKey, task);
-      return task;
+    const promise = this.getPackageInfoPromises.get(cacheKey);
+    if (promise) {
+      return promise;
+    }
+    const task = this._getPackageInfo(name, version).finally(() => {
+      this.getPackageInfoPromises.delete(cacheKey);
+    });
+    this.getPackageInfoPromises.set(cacheKey, task);
+    return task;
   }
 
   private async _getPackageInfo(
@@ -100,15 +107,27 @@ export class NpmDepTreeAnalyzer {
       return this.packageCache.get(cacheKey)!;
     }
 
+    let alias:
+      | {
+          name: string;
+          version: string;
+        }
+      | undefined;
+
+    if (version.startsWith('npm:')) {
+      const lastAtSymbol = version.lastIndexOf('@');
+      alias = {
+        name: version.substring(4, lastAtSymbol),
+        version: version.substring(lastAtSymbol + 1),
+      };
+    }
+
     try {
       // First fetch the package metadata to get all versions
-      const metadataResponse = await fetch(
-        `${this.config.registry}/${name}`,
-        {
-          headers: this.config.headers,
-          signal: AbortSignal.timeout(this.config.timeout),
-        }
-      );
+      const metadataResponse = await fetch(`${this.config.registry}/${alias?.name || name}`, {
+        headers: this.config.headers,
+        signal: AbortSignal.timeout(this.config.timeout),
+      });
 
       if (!metadataResponse.ok) {
         throw new PackageNotFoundError(name, version);
@@ -116,18 +135,19 @@ export class NpmDepTreeAnalyzer {
 
       const metadata = await metadataResponse.json();
       const versions = metadata.versions || {};
+      const versionForMatch = alias?.version || version;
 
       // Find the exact version or best matching version
       let matchedVersion: string | null = null;
-      if (versions[version]) {
+      if (versions[versionForMatch]) {
         // Exact version match
-        matchedVersion = version;
-      } else if (metadata['dist-tags'] && metadata['dist-tags'][version]) {
+        matchedVersion = versionForMatch;
+      } else if (metadata['dist-tags'] && metadata['dist-tags'][versionForMatch]) {
         // Check if the version is a known dist-tag
-        matchedVersion = metadata['dist-tags'][version];
-      } else if (semver.validRange(version)) {
+        matchedVersion = metadata['dist-tags'][versionForMatch];
+      } else if (semver.validRange(versionForMatch)) {
         // Find highest version that satisfies the range
-        matchedVersion = semver.maxSatisfying(Object.keys(versions), version);
+        matchedVersion = semver.maxSatisfying(Object.keys(versions), versionForMatch);
       }
 
       if (!matchedVersion) {
@@ -139,11 +159,14 @@ export class NpmDepTreeAnalyzer {
       }
 
       const packageInfo: PackageInfo = {
-        name: metadata.versions[matchedVersion].name,
+        name,
         version: matchedVersion,
         dependencies: metadata.versions[matchedVersion].dependencies || {},
-        devDependencies: metadata.versions[matchedVersion].devDependencies || {},
-        peerDependencies: metadata.versions[matchedVersion].peerDependencies || {},
+        devDependencies:
+          metadata.versions[matchedVersion].devDependencies || {},
+        peerDependencies:
+          metadata.versions[matchedVersion].peerDependencies || {},
+        alias,
       };
 
       // Cache the result
@@ -162,8 +185,8 @@ export class NpmDepTreeAnalyzer {
     name: string,
     version: string,
     flatDeps: Map<string, FlatDependency>,
-    parentPath: string = ''
-  ): Promise<DependencyNode> {
+    parentNodes: string[] = []
+  ): Promise<DependencyNode | undefined> {
     const packageInfo = await this.getPackageInfo(name, version);
     const node: DependencyNode = {
       name,
@@ -174,9 +197,12 @@ export class NpmDepTreeAnalyzer {
       ),
     };
 
-    const currentPath = parentPath
-      ? `${parentPath} > ${name}@${packageInfo.version}`
-      : `${name}@${packageInfo.version}`;
+    // Find circular dependencies
+    if (parentNodes.includes(`${name}@${packageInfo.version}`)) {
+      return;
+    }
+
+    const currentPath = parentNodes.concat(`${name}@${packageInfo.version}`);
 
     // Add to flat dependencies
     const key = `${name}@${packageInfo.version}`;
@@ -184,10 +210,10 @@ export class NpmDepTreeAnalyzer {
       flatDeps.set(key, {
         name,
         version: packageInfo.version,
-        requiredBy: new Set([parentPath || 'root']),
+        requiredBy: new Set([currentPath.join(' > ') || 'root']),
       });
     } else {
-      flatDeps.get(key)!.requiredBy.add(parentPath || 'root');
+      flatDeps.get(key)!.requiredBy.add(parentNodes.join(' > ') || 'root');
     }
 
     // Process regular dependencies
@@ -208,7 +234,7 @@ export class NpmDepTreeAnalyzer {
 
     // Add successful results to the dependencies map
     results.forEach((result) => {
-      if (result) {
+      if (result && result.depNode) {
         node.dependencies.set(result.depName, result.depNode);
       }
     });
@@ -216,7 +242,13 @@ export class NpmDepTreeAnalyzer {
     return node;
   }
 
-  public static printDependencyTree(node: DependencyNode, prefix: string = '') {
+  public static printDependencyTree(
+    node?: DependencyNode,
+    prefix: string = ''
+  ) {
+    if (!node) {
+      return;
+    }
     console.log(`${prefix}${node.name}@${node.version}`);
 
     // Print peer dependencies if any
@@ -250,7 +282,10 @@ export class NpmDepTreeAnalyzer {
     });
   }
 
-  static printHoistedTree(hoistedTree: HoistedTree): void {
+  static printHoistedTree(hoistedTree?: HoistedTree): void {
+    if (!hoistedTree) {
+      return;
+    }
     console.log(
       '\nHoisted Dependency Tree (similar to node_modules structure):'
     );
@@ -489,13 +524,19 @@ export class NpmDepTreeAnalyzer {
       version,
       flatDeps
     );
-    const hoistedTree = this.convertToHoistedTree(dependencyTree);
+    if (dependencyTree) {
+      const hoistedTree = this.convertToHoistedTree(dependencyTree);
 
-    return {
-      dependencyTree,
-      hoistedTree,
-      flatDependencies: flatDeps,
-    };
+      return {
+        dependencyTree,
+        hoistedTree,
+        flatDependencies: flatDeps,
+      };
+    } else {
+      return {
+        flatDependencies: flatDeps,
+      };
+    }
   }
 
   async analyzeMultiple(
@@ -519,6 +560,9 @@ export class NpmDepTreeAnalyzer {
 
     // Merge all individual trees into the virtual root
     for (const [pkgKey, result] of individual) {
+      if (!result.dependencyTree) {
+        continue;
+      }
       virtualRoot.dependencies.set(pkgKey, result.dependencyTree);
 
       // Merge flat dependencies

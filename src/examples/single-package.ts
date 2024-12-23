@@ -3,7 +3,7 @@ import { NpmDepTreeAnalyzer } from '../index';
 async function main() {
   // Initialize analyzer with custom registry
   const analyzer = new NpmDepTreeAnalyzer({
-    registry: 'https://registry.npmmirror.com',
+    registry: 'https://registry.anpm.alibaba-inc.com',
     timeout: 30000,
     headers: {
       'User-Agent': 'npm-dep-tree-analyzer-example'
@@ -11,8 +11,8 @@ async function main() {
   });
 
   // Example package to analyze
-  const packageName = 'next';
-  const version = '14.0.3';
+  const packageName = 'tailwindcss';
+  const version = 'latest';
 
   console.log(`\nExample 1: Analyzing ${packageName}@${version}...`);
   const result = await analyzer.analyze(packageName, version);

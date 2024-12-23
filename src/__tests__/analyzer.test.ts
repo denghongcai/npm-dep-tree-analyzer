@@ -36,9 +36,9 @@ describe('NpmDepTreeAnalyzer', () => {
 
     it('should analyze package with no dependencies', async () => {
       const result = await analyzer.analyze('lodash', '4.17.21');
-      expect(result.dependencyTree.name).toBe('lodash');
-      expect(result.dependencyTree.version).toBe('4.17.21');
-      expect(result.dependencyTree.dependencies.size).toBe(0);
+      expect(result.dependencyTree?.name).toBe('lodash');
+      expect(result.dependencyTree?.version).toBe('4.17.21');
+      expect(result.dependencyTree?.dependencies.size).toBe(0);
     });
 
     it('should throw error for invalid package', async () => {
@@ -56,16 +56,16 @@ describe('NpmDepTreeAnalyzer', () => {
     it('should handle peer dependencies correctly', async () => {
       // Testing @testing-library/react which has react as a peer dependency
       const result = await analyzer.analyze('@testing-library/react', '14.1.2');
-      expect(result.dependencyTree.name).toBe('@testing-library/react');
-      expect(result.dependencyTree.peerDependencies.size).toBeGreaterThan(0);
-      expect(result.dependencyTree.peerDependencies.has('react')).toBe(true);
+      expect(result.dependencyTree?.name).toBe('@testing-library/react');
+      expect(result.dependencyTree?.peerDependencies.size).toBeGreaterThan(0);
+      expect(result.dependencyTree?.peerDependencies.has('react')).toBe(true);
     });
 
     it('should handle latest tag for dependencies', async () => {
       const result = await analyzer.analyze('lodash', 'latest');
-      expect(result.dependencyTree.name).toBe('lodash');
-      expect(result.dependencyTree.version).toMatch(/^\d+\.\d+\.\d+$/); // Ensure it's a valid semver
-      expect(result.dependencyTree.dependencies.size).toBeGreaterThanOrEqual(0);
+      expect(result.dependencyTree?.name).toBe('lodash');
+      expect(result.dependencyTree?.version).toMatch(/^\d+\.\d+\.\d+$/); // Ensure it's a valid semver
+      expect(result.dependencyTree?.dependencies.size).toBeGreaterThanOrEqual(0);
     });
 
     it('should handle other dist-tags', async () => {
@@ -79,8 +79,8 @@ describe('NpmDepTreeAnalyzer', () => {
       for (const pkg of testPackages) {
         try {
           const result = await analyzer.analyze(pkg.name, pkg.tag);
-          expect(result.dependencyTree.name).toBe(pkg.name);
-          expect(result.dependencyTree.version).toMatch(/^\d+\.\d+\.\d+$/);
+          expect(result.dependencyTree?.name).toBe(pkg.name);
+          expect(result.dependencyTree?.version).toMatch(/^\d+\.\d+\.\d+$/);
         } catch (error) {
           // Some packages might not have all dist-tags, so we'll log but not fail
           console.warn(`Could not resolve ${pkg.name} with tag ${pkg.tag}`);
