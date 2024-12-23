@@ -576,6 +576,7 @@ export class NpmDepTreeAnalyzer {
           combinedFlatDeps.set(key, {
             name: dep.name,
             version: dep.version,
+            alias: dep.alias,
             requiredBy: new Set(dep.requiredBy),
           });
         } else {
