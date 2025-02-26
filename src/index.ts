@@ -42,12 +42,12 @@ export interface HoistedDependency {
   },
   dependencies: Map<string, string>; // key: package name, value: version
   peerDependencies: Map<string, string>; // key: package name, value: version range
-  parent?: string; // undefined means it's hoisted to root
+  parent?: DependencyNode; // undefined means it's hoisted to root
 }
 
 export interface HoistedTree {
   root: Map<string, HoistedDependency>; // hoisted dependencies
-  nested: Map<string, Map<string, HoistedDependency>>; // nested dependencies that couldn't be hoisted
+  nested: Map<DependencyNode, Map<string, HoistedDependency>>; // nested dependencies that couldn't be hoisted
 }
 
 export interface NpmRegistryConfig {
@@ -336,7 +336,7 @@ export class NpmDepTreeAnalyzer {
         '\nNested dependencies (could not be hoisted due to version conflicts or peer dependency constraints):'
       );
       for (const [parent, deps] of hoistedTree.nested) {
-        console.log(`\n${parent}/node_modules/`);
+        console.log(`\n${parent.name}@${parent.version}/node_modules/`);
         for (const [name, dep] of deps) {
           console.log(`├── ${name}@${dep.version}`);
 
@@ -378,17 +378,17 @@ export class NpmDepTreeAnalyzer {
 
   private convertToHoistedTree(
     node: DependencyNode,
-    parentPath: string = ''
+    parentNode?: DependencyNode,
   ): HoistedTree {
     const hoistedTree: HoistedTree = {
       root: new Map<string, HoistedDependency>(),
-      nested: new Map<string, Map<string, HoistedDependency>>(),
+      nested: new Map<DependencyNode, Map<string, HoistedDependency>>(),
     };
 
     // Helper function to convert DependencyNode to HoistedDependency
     const convertToHoistedDep = (
       node: DependencyNode,
-      parent?: string
+      parent?: DependencyNode,
     ): HoistedDependency => ({
       name: node.name,
       version: node.version,
@@ -479,7 +479,7 @@ export class NpmDepTreeAnalyzer {
     // Process dependencies recursively
     const processNode = (
       node: DependencyNode,
-      parentPath: string,
+      parent: DependencyNode,
       isRoot: boolean = false
     ) => {
       const nodeKey = `${node.name}@${node.version}`;
@@ -487,7 +487,7 @@ export class NpmDepTreeAnalyzer {
       if (isRoot) {
         hoistedTree.root.set(node.name, convertToHoistedDep(node));
         for (const [depName, depNode] of node.dependencies) {
-          processNode(depNode, nodeKey);
+          processNode(depNode, depNode);
         }
         return;
       }
@@ -499,33 +499,33 @@ export class NpmDepTreeAnalyzer {
           hoistedTree.root.set(node.name, convertToHoistedDep(node));
         } else {
           // Cannot be hoisted due to peer dependency constraints
-          if (!hoistedTree.nested.has(parentPath)) {
-            hoistedTree.nested.set(parentPath, new Map());
+          if (!hoistedTree.nested.has(parent)) {
+            hoistedTree.nested.set(parent, new Map());
           }
           hoistedTree.nested
-            .get(parentPath)!
-            .set(node.name, convertToHoistedDep(node, parentPath));
+            .get(parent)!
+            .set(node.name, convertToHoistedDep(node, parent));
         }
       } else {
         const existingDep = hoistedTree.root.get(node.name)!;
         if (hasVersionConflict(existingDep, node) || !canBeHoisted(node)) {
           // Version conflict or peer dependency constraints, needs to be nested
-          if (!hoistedTree.nested.has(parentPath)) {
-            hoistedTree.nested.set(parentPath, new Map());
+          if (!hoistedTree.nested.has(parent)) {
+            hoistedTree.nested.set(parent, new Map());
           }
           hoistedTree.nested
-            .get(parentPath)!
-            .set(node.name, convertToHoistedDep(node, parentPath));
+            .get(parent)!
+            .set(node.name, convertToHoistedDep(node, parent));
         }
       }
 
       // Process dependencies of current node
       for (const [depName, depNode] of node.dependencies) {
-        processNode(depNode, nodeKey);
+        processNode(depNode, depNode);
       }
     };
 
-    processNode(node, '', true);
+    processNode(node, null as any, true);
     return hoistedTree;
   }
 
