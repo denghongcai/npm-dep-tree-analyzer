@@ -17,6 +17,10 @@ export interface DependencyNode {
   version: string;
   dependencies: Map<string, DependencyNode>;
   peerDependencies: Map<string, string>; // key: package name, value: version range
+  alias?: {
+    name: string;
+    version: string;
+  },
 }
 
 export interface FlatDependency {
@@ -32,6 +36,10 @@ export interface FlatDependency {
 interface HoistedDependency {
   name: string;
   version: string;
+  alias?: {
+    name: string;
+    version: string;
+  },
   dependencies: Map<string, string>; // key: package name, value: version
   peerDependencies: Map<string, string>; // key: package name, value: version range
   parent?: string; // undefined means it's hoisted to root
@@ -199,6 +207,7 @@ export class NpmDepTreeAnalyzer {
       peerDependencies: new Map(
         Object.entries(packageInfo.peerDependencies ?? {})
       ),
+      alias: packageInfo.alias,
     };
 
     // Find circular dependencies
@@ -298,7 +307,7 @@ export class NpmDepTreeAnalyzer {
 
     // Print root level dependencies
     for (const [name, dep] of hoistedTree.root) {
-      console.log(`├── ${name}@${dep.version}`);
+      console.log(`├── ${dep.name}@${dep.version}`);
 
       // Print dependencies
       if (dep.dependencies.size > 0) {
@@ -391,6 +400,7 @@ export class NpmDepTreeAnalyzer {
       ),
       peerDependencies: new Map(node.peerDependencies),
       parent,
+      alias: node.alias,
     });
 
     // Helper function to check version conflicts
