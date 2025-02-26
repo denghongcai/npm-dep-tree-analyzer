@@ -33,7 +33,7 @@ export interface FlatDependency {
   requiredBy: Set<string>;
 }
 
-interface HoistedDependency {
+export interface HoistedDependency {
   name: string;
   version: string;
   alias?: {
@@ -50,7 +50,7 @@ export interface HoistedTree {
   nested: Map<string, Map<string, HoistedDependency>>; // nested dependencies that couldn't be hoisted
 }
 
-interface NpmRegistryConfig {
+export interface NpmRegistryConfig {
   registry?: string; // npm registry URL
   timeout?: number; // request timeout in milliseconds
   headers?: Record<string, string>; // custom headers for registry requests
