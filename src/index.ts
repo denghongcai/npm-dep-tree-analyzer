@@ -482,12 +482,10 @@ export class NpmDepTreeAnalyzer {
       parent: DependencyNode,
       isRoot: boolean = false
     ) => {
-      const nodeKey = `${node.name}@${node.version}`;
-
       if (isRoot) {
         hoistedTree.root.set(node.name, convertToHoistedDep(node));
         for (const [depName, depNode] of node.dependencies) {
-          processNode(depNode, depNode);
+          processNode(depNode, node);
         }
         return;
       }
@@ -521,7 +519,7 @@ export class NpmDepTreeAnalyzer {
 
       // Process dependencies of current node
       for (const [depName, depNode] of node.dependencies) {
-        processNode(depNode, depNode);
+        processNode(depNode, node);
       }
     };
 
