@@ -129,8 +129,8 @@ export class NpmDepTreeAnalyzer {
     if (version.startsWith('npm:')) {
       const aliasMatch = version.match(/^npm:(.+?)@(.+)$/);
       alias = {
-        name: aliasMatch[1],
-        version: aliasMatch[2]
+        name: aliasMatch![1],
+        version: aliasMatch![2]
       };
     }
 
@@ -178,10 +178,10 @@ export class NpmDepTreeAnalyzer {
           metadata.versions[matchedVersion].devDependencies || {},
         peerDependencies:
           metadata.versions[matchedVersion].peerDependencies || {},
-        alias:{
-          ...alias, // 这里是 alias 对应的名称
-          version: matchedVersion // 这里需要替换为匹配后的版本，例如 4.x、5.x 的需要获取对应的 lastest 版本
-        },
+        alias: alias ? {
+          name: alias.name,
+          version: matchedVersion
+        } : undefined,
       };
 
       // Cache the result
