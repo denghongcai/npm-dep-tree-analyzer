@@ -11,7 +11,7 @@ describe('NpmDepTreeAnalyzer', () => {
   beforeEach(() => {
     analyzer = new NpmDepTreeAnalyzer({
       registry: 'https://registry.npmmirror.com',
-      timeout: 5000,
+      timeout: 10000,
       headers: {
         'User-Agent': 'npm-dependency-analyzer-test',
       },
