@@ -127,10 +127,10 @@ export class NpmDepTreeAnalyzer {
       | undefined;
 
     if (version.startsWith('npm:')) {
-      const lastAtSymbol = version.lastIndexOf('@');
+      const aliasMatch = version.match(/^npm:(.+?)@(.+)$/);
       alias = {
-        name: version.substring(4, lastAtSymbol),
-        version: version.substring(lastAtSymbol + 2),
+        name: name: aliasMatch[1],
+        version: version: aliasMatch[2],
       };
     }
 
@@ -171,14 +171,17 @@ export class NpmDepTreeAnalyzer {
       }
 
       const packageInfo: PackageInfo = {
-        name,
+        name, // 原始的包名称
         version: matchedVersion,
         dependencies: metadata.versions[matchedVersion].dependencies || {},
         devDependencies:
           metadata.versions[matchedVersion].devDependencies || {},
         peerDependencies:
           metadata.versions[matchedVersion].peerDependencies || {},
-        alias,
+        alias:{
+          ...alias, // 这里是 alias 对应的名称
+          version: matchedVersion // 这里需要替换为匹配后的版本，例如 4.x、5.x 的需要获取对应的 lastest 版本
+        },
       };
 
       // Cache the result
