@@ -11,7 +11,7 @@ describe('NpmDepTreeAnalyzer', () => {
   beforeEach(() => {
     analyzer = new NpmDepTreeAnalyzer({
       registry: 'https://registry.npmmirror.com',
-      timeout: 10000,
+      timeout: 30000,
       headers: {
         'User-Agent': 'npm-dependency-analyzer-test',
       },
@@ -118,6 +118,163 @@ describe('NpmDepTreeAnalyzer', () => {
       await expect(
         timeoutAnalyzer.analyze('express', '4.18.2')
       ).rejects.toThrow();
+    });
+  });
+
+  describe('Hoisting Logic', () => {
+    it('should hoist common dependencies to the root', async () => {
+      // Mock getPackageInfo to avoid network requests
+      const getPackageInfoMock = jest.spyOn(
+        NpmDepTreeAnalyzer.prototype as any,
+        '_getPackageInfo'
+      );
+
+      getPackageInfoMock.mockImplementation(async (name: any, version: any) => {
+        const packages = {
+          'A@1.0.0': { name: 'A', version: '1.0.0', dependencies: { B: '1.0.0' } },
+          'B@1.0.0': { name: 'B', version: '1.0.0', dependencies: {} },
+          'C@1.0.0': { name: 'C', version: '1.0.0', dependencies: { B: '1.0.0' } },
+        };
+        // @ts-ignore
+        return packages[`${name}@${version}`];
+      });
+
+      const result = await analyzer.analyze([
+        { name: 'A', version: '1.0.0' },
+        { name: 'C', version: '1.0.0' },
+      ]);
+
+      const hoistedTree = result.combined.hoistedTree;
+
+      // A and C should be at the root
+      expect(hoistedTree.root.has('A')).toBe(true);
+      expect(hoistedTree.root.has('C')).toBe(true);
+
+      // B should be hoisted to the root
+      expect(hoistedTree.root.has('B')).toBe(true);
+      expect(hoistedTree.root.get('B')?.version).toBe('1.0.0');
+
+      // No nested dependencies
+      expect(hoistedTree.nested.size).toBe(0);
+
+      getPackageInfoMock.mockRestore();
+    });
+
+    it('should handle version conflicts by nesting dependencies', async () => {
+      const getPackageInfoMock = jest.spyOn(
+        NpmDepTreeAnalyzer.prototype as any,
+        '_getPackageInfo'
+      );
+
+      getPackageInfoMock.mockImplementation(async (name: any, version: any) => {
+        const packages = {
+          'A@1.0.0': { name: 'A', version: '1.0.0', dependencies: { B: '1.0.0' } },
+          'B@1.0.0': { name: 'B', version: '1.0.0', dependencies: {} },
+          'C@1.0.0': { name: 'C', version: '1.0.0', dependencies: { B: '2.0.0' } },
+          'B@2.0.0': { name: 'B', version: '2.0.0', dependencies: {} },
+        };
+         // @ts-ignore
+        return packages[`${name}@${version}`];
+      });
+
+      const result = await analyzer.analyze([
+        { name: 'A', version: '1.0.0' },
+        { name: 'C', version: '1.0.0' },
+      ]);
+
+      const hoistedTree = result.combined.hoistedTree;
+      const aNode = result.individual.get('A@1.0.0')?.dependencyTree;
+      const cNode = result.individual.get('C@1.0.0')?.dependencyTree;
+
+      // One version of B is hoisted
+      expect(hoistedTree.root.has('B')).toBe(true);
+
+      // The other version of B is nested
+      const nestedB = hoistedTree.nested.get(aNode!)?.get('B') ?? hoistedTree.nested.get(cNode!)?.get('B');
+      expect(nestedB).toBeDefined();
+
+      getPackageInfoMock.mockRestore();
+    });
+
+    it('should correctly resolve peer dependencies', async () => {
+        const getPackageInfoMock = jest.spyOn(
+            NpmDepTreeAnalyzer.prototype as any,
+            '_getPackageInfo'
+        );
+
+        getPackageInfoMock.mockImplementation(async (name: any, version: any) => {
+            const packages = {
+                'A@1.0.0': { name: 'A', version: '1.0.0', peerDependencies: { B: '1.0.0' } },
+                'B@1.0.0': { name: 'B', version: '1.0.0', dependencies: {} },
+            };
+            // @ts-ignore
+            return packages[`${name}@${version}`];
+        });
+
+        const result = await analyzer.analyze([
+            { name: 'A', version: '1.0.0' },
+            { name: 'B', version: '1.0.0' },
+        ]);
+
+        const hoistedTree = result.combined.hoistedTree;
+        expect(hoistedTree.root.has('A')).toBe(true);
+        expect(hoistedTree.root.has('B')).toBe(true);
+        expect(hoistedTree.nested.size).toBe(0);
+
+        getPackageInfoMock.mockRestore();
+    });
+
+    it('should support npm aliases', async () => {
+        const getPackageInfoMock = jest.spyOn(
+            NpmDepTreeAnalyzer.prototype as any,
+            '_getPackageInfo'
+        );
+
+        getPackageInfoMock.mockImplementation(async (name: any, version: any) => {
+            if (version.startsWith('npm:')) {
+                const aliasMatch = version.match(/^npm:(.+?)@(.+)$/);
+                const realName = aliasMatch![1];
+                const realVersion = aliasMatch![2];
+                return { name: name, version: realVersion, dependencies: {}, alias: { name: realName, version: realVersion } };
+            }
+            // @ts-ignore
+            return { name, version, dependencies: {} };
+        });
+
+        const result = await analyzer.analyze('my-b', 'npm:B@1.0.0');
+        const hoistedTree = result.hoistedTree;
+
+        expect(hoistedTree?.root.has('my-b')).toBe(true);
+        expect(hoistedTree?.root.get('my-b')?.name).toBe('my-b');
+        expect(hoistedTree?.root.get('my-b')?.alias?.name).toBe('B');
+
+        getPackageInfoMock.mockRestore();
+    });
+
+    it('should handle circular dependencies gracefully', async () => {
+      const getPackageInfoMock = jest.spyOn(
+        NpmDepTreeAnalyzer.prototype as any,
+        '_getPackageInfo'
+      );
+
+      getPackageInfoMock.mockImplementation(async (name: any, version: any) => {
+        const packages = {
+          'A@1.0.0': { name: 'A', version: '1.0.0', dependencies: { B: '1.0.0' } },
+          'B@1.0.0': { name: 'B', version: '1.0.0', dependencies: { A: '1.0.0' } },
+        };
+        // @ts-ignore
+        return packages[`${name}@${version}`];
+      });
+
+      const result = await analyzer.analyze('A', '1.0.0');
+      expect(result.dependencyTree).toBeDefined();
+      // We expect B to be a dependency of A
+      expect(result.dependencyTree?.dependencies.has('B')).toBe(true);
+      // But B's dependency on A should be undefined due to circular dependency detection
+      expect(result.dependencyTree?.dependencies.get('B')?.dependencies.has('A')).toBe(false);
+
+
+      getPackageInfoMock.mockRestore();
     });
   });
 });

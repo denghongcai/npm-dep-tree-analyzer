@@ -601,6 +601,7 @@ export class NpmDepTreeAnalyzer {
 
     // Generate combined hoisted tree
     const combinedHoistedTree = this.convertToHoistedTree(virtualRoot);
+    combinedHoistedTree.root.delete('virtual-root');
 
     return {
       individual,
